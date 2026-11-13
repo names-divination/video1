@@ -1,12 +1,796 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>動画テスト</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DualStream Sync Player - 映像・音声分離ストリーム同期プレイヤー</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Noto Sans JP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            950: '#090d16',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* カスタムレンジスライダーのスタイル */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            background: #334155;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #7dd3fc;
+        }
+        /* シークバー用の特別スタイル */
+        #seekBar::-webkit-slider-runnable-track {
+            height: 8px;
+        }
+        #seekBar::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            margin-top: -5px;
+            background: #6366f1;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.7);
+        }
+    </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
-  <video src="https://rr1---sn-g530uxow2-puhe.googlevideo.com/videoplayback?expire=1794572529&ei=kaz2arG_F9CDvcAPprGC4AM&ip=211.7.97.169&id=o-AP7VR9FqG8N5LQ8IeGO-N04HV2ouEZ_0NPzFysj-78dS&itag=136&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&cps=663&met=1794550929%2C&mh=KX&mm=18%2C29&mn=sn-g530uxow2-puhe%2Csn-oguesndl&ms=aub%2Crdu&mv=m&mvi=1&pcm2cms=yes&pl=24&rms=aub%2Caub&pcm2=no&initcwndbps=1512875&bui=AZFAFb-xA6zoEuqOJFWfoHoropqis3JNaL4tPfWETf5h8pU4qG4VZmpNlKZtg59E2_Zyr1TjC2tUTvPw&spc=nfZ8ZsHpwRSyoIfBx5GqkKdvI7yE5vYbNuRBwTsM6fBpSRoF3BiMTRyw2YR2&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&gir=yes&clen=51110527&dur=248.366&lmt=1793021196062852&mt=1794550447&fvip=5&epbp=1&keepalive=yes&fexp=51565116%2C52338435&c=VISIONOS&txp=5532234&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cpcm2%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cdur%2Clmt&sig=AE0s2JYwRQIgEEHl_2-SmZxAOTb5IC8luLjuxaIbFU6reRcraGHS9CUCIQDEvOm8v5Tn4HzrXrv3yPgxzEfuZIE7n0txWq058Pw-mQ%3D%3D&lsparams=cps%2Cmet%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpcm2cms%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRQIhAOQMC2pKaHq1t52F8sGF3ShNQswSFnZCd3bTmiyynBmsAiA4ghjGW8K9CWovJei4aXKLMncz6NUyLxv-9LlD5-smsg%3D%3D" controls></video>
+    <!-- ヘッダー -->
+    <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+                        DualStream Sync Player
+                    </h1>
+                    <p class="text-xs text-slate-400">映像ストリーム × 音声ストリーム リアルタイム同期エンジン</p>
+                </div>
+            </div>
 
+            <!-- リアルタイム同期ステータスバッジ -->
+            <div class="flex items-center gap-2.5 bg-slate-850 border border-slate-700/70 px-3.5 py-1.5 rounded-full">
+                <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                <span id="statusText" class="text-xs font-medium text-slate-300">待機中 (URLを入力してください)</span>
+                <span id="driftBadge" class="hidden text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">
+                    ズレ: 0.00s
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+
+        <!-- URL入力パネル -->
+        <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    ストリームURL設定 (googlevideo.com / DASH / 直リンク対応)
+                </h2>
+                <button id="loadSampleBtn" type="button" class="text-xs font-medium text-cyan-400 hover:text-cyan-300 bg-cyan-950/50 hover:bg-cyan-900/50 border border-cyan-800/60 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    サンプル動画・音声で動作テスト
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 映像URL -->
+                <div class="space-y-1.5">
+                    <label for="videoUrlInput" class="block text-xs font-medium text-slate-400">
+                        映像側 URL (Video Stream / 映像のみ推奨)
+                    </label>
+                    <div class="relative">
+                        <input id="videoUrlInput" type="url" placeholder="https://rr1---sn-....googlevideo.com/videoplayback?..." 
+                            class="w-full bg-slate-950 border border-slate-700/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition">
+                        <button type="button" onclick="clearInput('videoUrlInput')" title="クリア" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 音声URL -->
+                <div class="space-y-1.5">
+                    <label for="audioUrlInput" class="block text-xs font-medium text-slate-400">
+                        音声側 URL (Audio Stream / m4a・webm・mp3等)
+                    </label>
+                    <div class="relative">
+                        <input id="audioUrlInput" type="url" placeholder="https://rr1---sn-....googlevideo.com/videoplayback?..." 
+                            class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none transition">
+                        <button type="button" onclick="clearInput('audioUrlInput')" title="クリア" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <!-- トラブルシューティング開閉ボタン -->
+                <button id="toggleTipsBtn" type="button" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>googlevideo.com のURLがエラー(403/CORS)になる場合の対処法</span>
+                    <svg id="tipsChevron" class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <button id="loadBtn" type="button" class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/25 transition active:scale-[0.99] flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    読み込み・同期セット
+                </button>
+            </div>
+
+            <!-- 折りたたみ式トラブルシューティングガイド -->
+            <div id="tipsPanel" class="hidden bg-slate-950/90 border border-amber-500/30 rounded-xl p-4 text-xs text-slate-300 space-y-2 leading-relaxed">
+                <p class="font-semibold text-amber-400">💡 googlevideo.com ストリーム再生時の技術ポイント：</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-400">
+                    <li><strong class="text-slate-200">CORS / Referer制限：</strong> <code>googlevideo.com</code> は外部ドメインからの直接読み込みをブロックする場合があります。ローカル環境やテストで再生できない場合は、ブラウザ拡張機能（<em>ModHeader</em> や <em>CORS Unblock</em> 等）でリクエストヘッダの <code>Origin</code> / <code>Referer</code> を <code>https://www.youtube.com</code> に設定すると通過しやすくなります。</li>
+                    <li><strong class="text-slate-200">有効期限とIP制限：</strong> URL生成時のIPアドレスと異なる環境（VPN切り替え等）や、発行から数時間経過したURLは <code>403 Forbidden</code> になります。</li>
+                    <li><strong class="text-slate-200">音声のみURLの指定：</strong> 音声欄に「映像+音声」のURLを入れても音声は再生されますが、軽量な音声専用ストリーム（<code>mime=audio/mp4</code> や <code>audio/webm</code>）を指定すると同期精度が向上します。</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- エラーログ表示エリア（エラー発生時のみ表示） -->
+        <div id="errorBox" class="hidden bg-rose-950/60 border border-rose-500/50 rounded-2xl p-4 text-sm text-rose-200 flex items-start gap-3">
+            <svg class="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div class="space-y-1 flex-1">
+                <p class="font-semibold text-rose-300" id="errorTitle">ストリームの読み込みエラー</p>
+                <p class="text-xs text-rose-200/90 font-mono break-all" id="errorDetail"></p>
+            </div>
+            <button type="button" onclick="hideError()" class="text-rose-400 hover:text-rose-200 text-xs px-2 py-1">閉じる</button>
+        </div>
+
+        <!-- プレイヤー本体コンテナ -->
+        <section id="playerContainer" class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+            <!-- 映像表示エリア -->
+            <div class="relative bg-black aspect-video w-full flex items-center justify-center group overflow-hidden">
+                <video id="videoPlayer" class="w-full h-full object-contain" playsinline muted preload="auto"></video>
+                <!-- 非表示の音声専用プレイヤー -->
+                <audio id="audioPlayer" preload="auto"></audio>
+
+                <!-- バッファリング・同期中のオーバーレイスピナー -->
+                <div id="bufferingOverlay" class="hidden absolute inset-0 bg-slate-950/75 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-20">
+                    <div class="w-11 h-11 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                    <p id="bufferingMessage" class="text-sm font-medium text-cyan-300">映像と音声のバッファを同期中...</p>
+                </div>
+
+                <!-- 初期状態のプレースホルダー -->
+                <div id="emptyOverlay" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 pointer-events-none p-6 text-center">
+                    <svg class="w-14 h-14 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                    </svg>
+                    <p class="text-sm font-medium text-slate-400">上部のフォームに映像URLと音声URLを入力して「読み込み・同期セット」を押してください</p>
+                </div>
+            </div>
+
+            <!-- カスタム統合コントロールバー -->
+            <div class="p-4 sm:p-5 bg-slate-900 space-y-4 border-t border-slate-800/80">
+                
+                <!-- シークバー（タイムライン） -->
+                <div class="space-y-1.5">
+                    <input id="seekBar" type="range" min="0" max="100" step="0.01" value="0" disabled
+                        class="w-full disabled:opacity-40 disabled:cursor-not-allowed">
+                    <div class="flex justify-between text-xs font-mono text-slate-400">
+                        <span id="currentTimeDisplay">00:00.0</span>
+                        <span id="streamInfoDisplay" class="text-[11px] text-slate-500 hidden sm:inline">映像: 未読込 / 音声: 未読込</span>
+                        <span id="durationDisplay">00:00.0</span>
+                    </div>
+                </div>
+
+                <!-- メイン操作ボタン群 -->
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    
+                    <!-- 左側：再生・停止・頭出し・音量 -->
+                    <div class="flex items-center gap-2.5 sm:gap-3">
+                        <button id="playPauseBtn" type="button" disabled
+                            class="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white p-3 rounded-xl transition shadow-md flex items-center justify-center">
+                            <!-- 再生アイコン -->
+                            <svg id="playIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <!-- 一時停止アイコン -->
+                            <svg id="pauseIcon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                            </svg>
+                        </button>
+
+                        <button id="restartBtn" type="button" disabled title="最初から再生 (同期リセット)"
+                            class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 p-2.5 rounded-xl transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9" />
+                            </svg>
+                        </button>
+
+                        <!-- 音量コントロール -->
+                        <div class="flex items-center gap-2 bg-slate-850 border border-slate-800 px-3 py-2 rounded-xl">
+                            <button id="muteBtn" type="button" class="text-slate-300 hover:text-white transition" title="ミュート切替">
+                                <svg id="volHighIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                </svg>
+                                <svg id="volMuteIcon" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                </svg>
+                            </button>
+                            <input id="volumeSlider" type="range" min="0" max="1" step="0.02" value="1" class="w-20 sm:w-24">
+                        </div>
+                    </div>
+
+                    <!-- 右側：再生速度・強制再同期・フルスクリーン -->
+                    <div class="flex items-center gap-2.5">
+                        <!-- 強制再同期ボタン -->
+                        <button id="forceSyncBtn" type="button" disabled title="現在の映像位置に音声を即座に再同期"
+                            class="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-cyan-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>今すぐ同期</span>
+                        </button>
+
+                        <!-- 再生速度 -->
+                        <select id="speedSelect" aria-label="再生速度"
+                            class="bg-slate-850 border border-slate-700 text-slate-200 text-xs font-medium rounded-xl px-2.5 py-2 outline-none focus:border-indigo-500">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>1.0x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2.0x</option>
+                        </select>
+
+                        <!-- フルスクリーン -->
+                        <button id="fullscreenBtn" type="button" title="全画面表示"
+                            class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 音ズレ補正（オフセット微調整）パネル -->
+                <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-slate-300">🎛️ 音ズレ補正 (音声オフセット):</span>
+                        <span id="offsetValueDisplay" class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/60">
+                            0.00 秒
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-1 max-w-md">
+                        <button type="button" onclick="adjustOffset(-0.05)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono transition" title="音声を0.05秒早める">
+                            -0.05s
+                        </button>
+                        <input id="offsetSlider" type="range" min="-5" max="5" step="0.05" value="0" class="flex-1">
+                        <button type="button" onclick="adjustOffset(0.05)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono transition" title="音声を0.05秒遅らせる">
+                            +0.05s
+                        </button>
+                        <button type="button" onclick="resetOffset()" class="px-2.5 py-1 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg text-xs transition">
+                            リセット
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 映像側音声ミュート解除オプション（念のため映像URL側に音声が含まれている場合用） -->
+                <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                    <label class="inline-flex items-center gap-2 cursor-pointer hover:text-slate-300 transition">
+                        <input id="unmuteVideoCheck" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-indigo-500 focus:ring-0">
+                        <span>映像側ストリーム自体の音声もミュート解除する（通常はオフ推奨）</span>
+                    </label>
+                    <span>自動ドリフト補正: 0.15秒以上のズレを自動修正</span>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ==========================================
+        // DOM要素の取得
+        // ==========================================
+        const videoEl = document.getElementById('videoPlayer');
+        const audioEl = document.getElementById('audioPlayer');
+        const videoUrlInput = document.getElementById('videoUrlInput');
+        const audioUrlInput = document.getElementById('audioUrlInput');
+
+        const loadBtn = document.getElementById('loadBtn');
+        const loadSampleBtn = document.getElementById('loadSampleBtn');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const restartBtn = document.getElementById('restartBtn');
+        const forceSyncBtn = document.getElementById('forceSyncBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+        const seekBar = document.getElementById('seekBar');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const streamInfoDisplay = document.getElementById('streamInfoDisplay');
+
+        const volumeSlider = document.getElementById('volumeSlider');
+        const muteBtn = document.getElementById('muteBtn');
+        const volHighIcon = document.getElementById('volHighIcon');
+        const volMuteIcon = document.getElementById('volMuteIcon');
+        const speedSelect = document.getElementById('speedSelect');
+
+        const offsetSlider = document.getElementById('offsetSlider');
+        const offsetValueDisplay = document.getElementById('offsetValueDisplay');
+        const unmuteVideoCheck = document.getElementById('unmuteVideoCheck');
+
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const driftBadge = document.getElementById('driftBadge');
+        const bufferingOverlay = document.getElementById('bufferingOverlay');
+        const bufferingMessage = document.getElementById('bufferingMessage');
+        const emptyOverlay = document.getElementById('emptyOverlay');
+
+        const errorBox = document.getElementById('errorBox');
+        const errorTitle = document.getElementById('errorTitle');
+        const errorDetail = document.getElementById('errorDetail');
+        const toggleTipsBtn = document.getElementById('toggleTipsBtn');
+        const tipsPanel = document.getElementById('tipsPanel');
+        const tipsChevron = document.getElementById('tipsChevron');
+
+        // ==========================================
+        // 状態管理変数
+        // ==========================================
+        let isLoaded = false;
+        let userWantsToPlay = false;   // ユーザーが再生を意図しているか
+        let isVideoBuffering = false;
+        let isAudioBuffering = false;
+        let isSeeking = false;
+        let audioOffset = 0.0;         // 音声のオフセット秒数（正＝音声を遅らせる / 負＝音声を早める）
+        let syncInterval = null;
+
+        // ==========================================
+        // ユーティリティ関数
+        // ==========================================
+        function formatTime(seconds) {
+            if (!isFinite(seconds) || seconds < 0) return '00:00.0';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const tenths = Math.floor((seconds % 1) * 10);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${tenths}`;
+        }
+
+        function setStatus(type, text) {
+            statusText.textContent = text;
+            statusDot.className = 'w-2.5 h-2.5 rounded-full transition-colors ';
+            switch (type) {
+                case 'idle':
+                    statusDot.className += 'bg-slate-500';
+                    break;
+                case 'ready':
+                    statusDot.className += 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]';
+                    break;
+                case 'playing':
+                    statusDot.className += 'bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse';
+                    break;
+                case 'buffering':
+                    statusDot.className += 'bg-amber-400 animate-ping';
+                    break;
+                case 'error':
+                    statusDot.className += 'bg-rose-500 shadow-[0_0_8px_#f43f5e]';
+                    break;
+            }
+        }
+
+        function showError(title, detail) {
+            errorTitle.textContent = title;
+            errorDetail.textContent = detail;
+            errorBox.classList.remove('hidden');
+            setStatus('error', 'エラー発生');
+        }
+
+        function hideError() {
+            errorBox.classList.add('hidden');
+        }
+
+        function clearInput(id) {
+            document.getElementById(id).value = '';
+        }
+
+        // トラブルシューティング開閉
+        toggleTipsBtn.addEventListener('click', () => {
+            tipsPanel.classList.toggle('hidden');
+            tipsChevron.classList.toggle('rotate-180');
+        });
+
+        // ==========================================
+        // ストリームの読み込み処理
+        // ==========================================
+        function loadStreams() {
+            const vUrl = videoUrlInput.value.trim();
+            const aUrl = audioUrlInput.value.trim();
+
+            if (!vUrl || !aUrl) {
+                showError('URLが不足しています', '映像側URLと音声側URLの両方を入力してください。');
+                return;
+            }
+
+            hideError();
+            pauseBoth();
+            userWantsToPlay = false;
+            isLoaded = false;
+            isVideoBuffering = true;
+            isAudioBuffering = true;
+
+            emptyOverlay.classList.add('hidden');
+            bufferingOverlay.classList.remove('hidden');
+            bufferingMessage.textContent = '映像と音声ストリームに接続中...';
+            setStatus('buffering', 'ストリーム読み込み中...');
+
+            // ソースのセット
+            videoEl.src = vUrl;
+            audioEl.src = aUrl;
+            videoEl.muted = !unmuteVideoCheck.checked;
+            audioEl.volume = parseFloat(volumeSlider.value);
+            videoEl.playbackRate = parseFloat(speedSelect.value);
+            audioEl.playbackRate = parseFloat(speedSelect.value);
+
+            videoEl.load();
+            audioEl.load();
+
+            // UIボタン有効化
+            playPauseBtn.disabled = false;
+            restartBtn.disabled = false;
+            forceSyncBtn.disabled = false;
+            seekBar.disabled = false;
+            driftBadge.classList.remove('hidden');
+        }
+
+        // サンプル動画・音声のセット（CORS許可済みのパブリックテスト素材）
+        loadSampleBtn.addEventListener('click', () => {
+            // 映像：Big Buck Bunny (MP4) / 音声：同作品の音声トラック（テスト用に別URLのMP4/MP3を同期）
+            videoUrlInput.value = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+            audioUrlInput.value = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+            loadStreams();
+        });
+
+        loadBtn.addEventListener('click', loadStreams);
+
+        // ==========================================
+        // 同期再生・一時停止・バッファリング制御
+        // ==========================================
+        async function playBoth() {
+            if (!videoEl.src || !audioEl.src) return;
+            userWantsToPlay = true;
+
+            // 再生開始前に位置を厳密に合わせる
+            syncAudioToVideo(true);
+
+            try {
+                // 映像と音声を同時に再生開始
+                await Promise.all([
+                    videoEl.play(),
+                    audioEl.play()
+                ]);
+                updatePlayPauseUI(true);
+                setStatus('playing', '同期再生中');
+                startDriftMonitor();
+            } catch (err) {
+                console.warn('再生開始待機またはブロック:', err);
+                // まだバッファが足りていない場合は canplay イベントに任せる
+            }
+        }
+
+        function pauseBoth(keepIntent = false) {
+            if (!keepIntent) {
+                userWantsToPlay = false;
+            }
+            videoEl.pause();
+            audioEl.pause();
+            updatePlayPauseUI(false);
+            if (!keepIntent && isLoaded) {
+                setStatus('ready', '一時停止中');
+            }
+            stopDriftMonitor();
+        }
+
+        function updatePlayPauseUI(isPlaying) {
+            if (isPlaying) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            }
+        }
+
+        // バッファリング状態のチェックと相互待機
+        function evaluateBufferingState() {
+            if (!videoEl.src || !audioEl.src) return;
+
+            if (isVideoBuffering || isAudioBuffering) {
+                bufferingOverlay.classList.remove('hidden');
+                const who = (isVideoBuffering && isAudioBuffering) ? '映像・音声の両方' : (isVideoBuffering ? '映像側' : '音声側');
+                bufferingMessage.textContent = `${who}のバッファリングを待機中...`;
+                setStatus('buffering', `バッファ待機中 (${who})`);
+
+                // 再生中だった場合は片方だけ進まないよう一時停止して待機
+                if (!videoEl.paused || !audioEl.paused) {
+                    videoEl.pause();
+                    audioEl.pause();
+                }
+            } else {
+                bufferingOverlay.classList.add('hidden');
+                isLoaded = true;
+                if (userWantsToPlay) {
+                    playBoth();
+                } else {
+                    setStatus('ready', '準備完了 (再生可能)');
+                }
+            }
+        }
+
+        // 映像側イベント
+        videoEl.addEventListener('waiting', () => { isVideoBuffering = true; evaluateBufferingState(); });
+        videoEl.addEventListener('stalled', () => { isVideoBuffering = true; evaluateBufferingState(); });
+        videoEl.addEventListener('canplay', () => { isVideoBuffering = false; evaluateBufferingState(); });
+        videoEl.addEventListener('loadedmetadata', () => {
+            seekBar.max = videoEl.duration || 100;
+            durationDisplay.textContent = formatTime(videoEl.duration);
+            updateStreamInfoText();
+        });
+
+        // 音声側イベント
+        audioEl.addEventListener('waiting', () => { isAudioBuffering = true; evaluateBufferingState(); });
+        audioEl.addEventListener('stalled', () => { isAudioBuffering = true; evaluateBufferingState(); });
+        audioEl.addEventListener('canplay', () => { isAudioBuffering = false; evaluateBufferingState(); });
+        audioEl.addEventListener('loadedmetadata', () => {
+            updateStreamInfoText();
+        });
+
+        function updateStreamInfoText() {
+            const vDur = isFinite(videoEl.duration) ? formatTime(videoEl.duration) : '読込中';
+            const aDur = isFinite(audioEl.duration) ? formatTime(audioEl.duration) : '読込中';
+            streamInfoDisplay.textContent = `映像長: ${vDur} / 音声長: ${aDur}`;
+        }
+
+        // エラーハンドリング
+        videoEl.addEventListener('error', () => {
+            const code = videoEl.error ? videoEl.error.code : '不明';
+            bufferingOverlay.classList.add('hidden');
+            showError(
+                `映像ストリームの読み込みに失敗しました (Error Code: ${code})`,
+                'URLの有効期限切れ、IP制限(403)、またはCORS制限によりブロックされた可能性があります。上の「対処法」をご確認ください。'
+            );
+        });
+
+        audioEl.addEventListener('error', () => {
+            const code = audioEl.error ? audioEl.error.code : '不明';
+            bufferingOverlay.classList.add('hidden');
+            showError(
+                `音声ストリームの読み込みに失敗しました (Error Code: ${code})`,
+                '音声URLが無効、またはサーバー側で外部アクセス(CORS/Referer)が拒否されています。'
+            );
+        });
+
+        // ==========================================
+        // ドリフト（音ズレ）監視＆自動補正エンジン
+        // ==========================================
+        function syncAudioToVideo(force = false) {
+            if (!isFinite(videoEl.currentTime)) return;
+            // 目標となる音声再生位置 = 映像位置 + オフセット
+            let targetAudioTime = Math.max(0, videoEl.currentTime + audioOffset);
+            if (isFinite(audioEl.duration) && targetAudioTime > audioEl.duration) {
+                targetAudioTime = audioEl.duration;
+            }
+
+            const drift = audioEl.currentTime - targetAudioTime;
+            driftBadge.textContent = `ズレ: ${drift >= 0 ? '+' : ''}${drift.toFixed(2)}s`;
+
+            // 強制同期、または 0.15秒以上のズレが発生した場合に補正
+            if (force || Math.abs(drift) > 0.15) {
+                audioEl.currentTime = targetAudioTime;
+                if (!force) {
+                    setStatus('playing', 'ズレ自動補正を実行しました');
+                    setTimeout(() => {
+                        if (userWantsToPlay && !isVideoBuffering && !isAudioBuffering) {
+                            setStatus('playing', '同期再生中');
+                        }
+                    }, 1200);
+                }
+            }
+        }
+
+        function startDriftMonitor() {
+            stopDriftMonitor();
+            syncInterval = setInterval(() => {
+                if (!videoEl.paused && !audioEl.paused && !isSeeking) {
+                    syncAudioToVideo(false);
+                }
+            }, 500);
+        }
+
+        function stopDriftMonitor() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+        }
+
+        // ==========================================
+        // コントロールUIのイベント処理
+        // ==========================================
+        playPauseBtn.addEventListener('click', () => {
+            if (userWantsToPlay) {
+                pauseBoth(false);
+            } else {
+                playBoth();
+            }
+        });
+
+        // 画面クリックでも再生・一時停止
+        videoEl.addEventListener('click', () => {
+            if (!isLoaded) return;
+            if (userWantsToPlay) pauseBoth(false);
+            else playBoth();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            videoEl.currentTime = 0;
+            audioEl.currentTime = Math.max(0, audioOffset);
+            seekBar.value = 0;
+            currentTimeDisplay.textContent = formatTime(0);
+            if (userWantsToPlay) playBoth();
+        });
+
+        forceSyncBtn.addEventListener('click', () => {
+            syncAudioToVideo(true);
+            setStatus(userWantsToPlay ? 'playing' : 'ready', '手動同期を実行しました');
+        });
+
+        // タイムライン更新とシーク操作
+        videoEl.addEventListener('timeupdate', () => {
+            if (!isSeeking) {
+                seekBar.value = videoEl.currentTime;
+                currentTimeDisplay.textContent = formatTime(videoEl.currentTime);
+            }
+        });
+
+        seekBar.addEventListener('input', () => {
+            isSeeking = true;
+            currentTimeDisplay.textContent = formatTime(parseFloat(seekBar.value));
+        });
+
+        seekBar.addEventListener('change', () => {
+            const newTime = parseFloat(seekBar.value);
+            videoEl.currentTime = newTime;
+            audioEl.currentTime = Math.max(0, newTime + audioOffset);
+            isSeeking = false;
+            if (userWantsToPlay) {
+                playBoth();
+            }
+        });
+
+        // 再生終了時の同期停止
+        videoEl.addEventListener('ended', () => {
+            pauseBoth(false);
+            setStatus('ready', '再生終了');
+        });
+
+        // 音量・ミュート
+        volumeSlider.addEventListener('input', () => {
+            const vol = parseFloat(volumeSlider.value);
+            audioEl.volume = vol;
+            audioEl.muted = (vol === 0);
+            updateMuteIcon();
+        });
+
+        muteBtn.addEventListener('click', () => {
+            audioEl.muted = !audioEl.muted;
+            updateMuteIcon();
+        });
+
+        function updateMuteIcon() {
+            if (audioEl.muted || audioEl.volume === 0) {
+                volHighIcon.classList.add('hidden');
+                volMuteIcon.classList.remove('hidden');
+            } else {
+                volHighIcon.classList.remove('hidden');
+                volMuteIcon.classList.add('hidden');
+            }
+        }
+
+        // 再生速度変更
+        speedSelect.addEventListener('change', () => {
+            const rate = parseFloat(speedSelect.value);
+            videoEl.playbackRate = rate;
+            audioEl.playbackRate = rate;
+            syncAudioToVideo(true);
+        });
+
+        // 音ズレオフセット調整
+        function updateOffsetUI() {
+            offsetSlider.value = audioOffset.toFixed(2);
+            const sign = audioOffset > 0 ? '+' : '';
+            offsetValueDisplay.textContent = `${sign}${audioOffset.toFixed(2)} 秒`;
+            syncAudioToVideo(true);
+        }
+
+        offsetSlider.addEventListener('input', () => {
+            audioOffset = parseFloat(offsetSlider.value);
+            updateOffsetUI();
+        });
+
+        function adjustOffset(delta) {
+            audioOffset = Math.max(-5, Math.min(5, Math.round((audioOffset + delta) * 100) / 100));
+            updateOffsetUI();
+        }
+
+        function resetOffset() {
+            audioOffset = 0.0;
+            updateOffsetUI();
+        }
+
+        // 映像側ミュート切替チェックボックス
+        unmuteVideoCheck.addEventListener('change', () => {
+            videoEl.muted = !unmuteVideoCheck.checked;
+        });
+
+        // フルスクリーン切替
+        fullscreenBtn.addEventListener('click', () => {
+            const container = document.getElementById('playerContainer');
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) container.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+    </script>
 </body>
 </html>
