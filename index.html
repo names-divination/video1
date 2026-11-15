@@ -124,7 +124,7 @@
                 <!-- 映像URL -->
                 <div class="space-y-1.5">
                     <label for="videoUrlInput" class="block text-xs font-medium text-slate-400">
-                        映像側 URL (Video Stream / 映像のみ推奨)
+                        映像側 URL (一体型・映像のみどちらも対応)
                     </label>
                     <div class="relative">
                         <input id="videoUrlInput" type="url" placeholder="https://rr1---sn-....googlevideo.com/videoplayback?..." 
@@ -138,7 +138,7 @@
                 <!-- 音声URL -->
                 <div class="space-y-1.5">
                     <label for="audioUrlInput" class="block text-xs font-medium text-slate-400">
-                        音声側 URL (Audio Stream / m4a・webm・mp3等)
+                        音声側 URL (分離型の場合のみ / 一体型なら空欄)
                     </label>
                     <div class="relative">
                         <input id="audioUrlInput" type="url" placeholder="https://rr1---sn-....googlevideo.com/videoplayback?..." 
@@ -212,7 +212,7 @@
                     <svg class="w-14 h-14 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
                     </svg>
-                    <p class="text-sm font-medium text-slate-400">上部のフォームに映像URLと音声URLを入力して「読み込み・同期セット」を押してください</p>
+                    <p class="text-sm font-medium text-slate-400">映像URLを入力してください。音声URLは分離型の場合のみ必要です</p>
                 </div>
             </div>
 
@@ -328,7 +328,7 @@
                 <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                     <label class="inline-flex items-center gap-2 cursor-pointer hover:text-slate-300 transition">
                         <input id="unmuteVideoCheck" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-indigo-500 focus:ring-0">
-                        <span>映像側ストリーム自体の音声もミュート解除する（通常はオフ推奨）</span>
+                        <span>分離型の映像ストリームに音声が含まれる場合も再生する</span>
                     </label>
                     <span>自動ドリフト補正: 0.15秒以上のズレを自動修正</span>
                 </div>
@@ -391,6 +391,7 @@
         let userWantsToPlay = false;   // ユーザーが再生を意図しているか
         let isVideoBuffering = false;
         let isAudioBuffering = false;
+        let hasSeparateAudio = false;
         let isSeeking = false;
         let audioOffset = 0.0;         // 音声のオフセット秒数（正＝音声を遅らせる / 負＝音声を早める）
         let syncInterval = null;
@@ -456,8 +457,8 @@
             const vUrl = videoUrlInput.value.trim();
             const aUrl = audioUrlInput.value.trim();
 
-            if (!vUrl || !aUrl) {
-                showError('URLが不足しています', '映像側URLと音声側URLの両方を入力してください。');
+            if (!vUrl) {
+                showError('映像URLがありません', '映像側URLを入力してください。音声URLは一体型ストリームなら空欄で構いません。');
                 return;
             }
 
@@ -465,38 +466,52 @@
             pauseBoth();
             userWantsToPlay = false;
             isLoaded = false;
+            hasSeparateAudio = Boolean(aUrl);
             isVideoBuffering = true;
-            isAudioBuffering = true;
+            isAudioBuffering = hasSeparateAudio;
 
             emptyOverlay.classList.add('hidden');
             bufferingOverlay.classList.remove('hidden');
-            bufferingMessage.textContent = '映像と音声ストリームに接続中...';
+            bufferingMessage.textContent = hasSeparateAudio
+                ? '映像と音声ストリームに接続中...'
+                : '一体型動画ストリームに接続中...';
             setStatus('buffering', 'ストリーム読み込み中...');
 
-            // ソースのセット
             videoEl.src = vUrl;
-            audioEl.src = aUrl;
-            videoEl.muted = !unmuteVideoCheck.checked;
-            audioEl.volume = parseFloat(volumeSlider.value);
+            videoEl.muted = hasSeparateAudio ? !unmuteVideoCheck.checked : false;
+            videoEl.volume = hasSeparateAudio ? 1 : parseFloat(volumeSlider.value);
             videoEl.playbackRate = parseFloat(speedSelect.value);
-            audioEl.playbackRate = parseFloat(speedSelect.value);
-
             videoEl.load();
-            audioEl.load();
 
-            // UIボタン有効化
+            if (hasSeparateAudio) {
+                audioEl.src = aUrl;
+                audioEl.volume = parseFloat(volumeSlider.value);
+                audioEl.muted = false;
+                audioEl.playbackRate = parseFloat(speedSelect.value);
+                audioEl.load();
+            } else {
+                audioEl.pause();
+                audioEl.removeAttribute('src');
+                audioEl.load();
+            }
+
+            // 一体型では同期関連UIを無効化する。
+            forceSyncBtn.disabled = !hasSeparateAudio;
+            driftBadge.classList.toggle('hidden', !hasSeparateAudio);
+            offsetSlider.disabled = !hasSeparateAudio;
+            unmuteVideoCheck.disabled = !hasSeparateAudio;
+            updateMuteIcon();
+
             playPauseBtn.disabled = false;
             restartBtn.disabled = false;
-            forceSyncBtn.disabled = false;
             seekBar.disabled = false;
-            driftBadge.classList.remove('hidden');
         }
 
         // サンプル動画・音声のセット（CORS許可済みのパブリックテスト素材）
         loadSampleBtn.addEventListener('click', () => {
-            // 映像：Big Buck Bunny (MP4) / 音声：同作品の音声トラック（テスト用に別URLのMP4/MP3を同期）
+            // 一体型MP4の動作確認。音声URLは空欄にする。
             videoUrlInput.value = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-            audioUrlInput.value = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+            audioUrlInput.value = '';
             loadStreams();
         });
 
@@ -506,24 +521,24 @@
         // 同期再生・一時停止・バッファリング制御
         // ==========================================
         async function playBoth() {
-            if (!videoEl.src || !audioEl.src) return;
+            if (!videoEl.src) return;
             userWantsToPlay = true;
 
-            // 再生開始前に位置を厳密に合わせる
-            syncAudioToVideo(true);
-
             try {
-                // 映像と音声を同時に再生開始
-                await Promise.all([
-                    videoEl.play(),
-                    audioEl.play()
-                ]);
-                updatePlayPauseUI(true);
-                setStatus('playing', '同期再生中');
-                startDriftMonitor();
+                if (hasSeparateAudio) {
+                    syncAudioToVideo(true);
+                    await Promise.all([videoEl.play(), audioEl.play()]);
+                    updatePlayPauseUI(true);
+                    setStatus('playing', '映像・音声を同期再生中');
+                    startDriftMonitor();
+                } else {
+                    stopDriftMonitor();
+                    await videoEl.play();
+                    updatePlayPauseUI(true);
+                    setStatus('playing', '一体型ストリーム再生中');
+                }
             } catch (err) {
                 console.warn('再生開始待機またはブロック:', err);
-                // まだバッファが足りていない場合は canplay イベントに任せる
             }
         }
 
@@ -552,18 +567,20 @@
 
         // バッファリング状態のチェックと相互待機
         function evaluateBufferingState() {
-            if (!videoEl.src || !audioEl.src) return;
+            if (!videoEl.src) return;
 
-            if (isVideoBuffering || isAudioBuffering) {
+            const waitingForAudio = hasSeparateAudio && isAudioBuffering;
+            if (isVideoBuffering || waitingForAudio) {
                 bufferingOverlay.classList.remove('hidden');
-                const who = (isVideoBuffering && isAudioBuffering) ? '映像・音声の両方' : (isVideoBuffering ? '映像側' : '音声側');
+                const who = hasSeparateAudio
+                    ? ((isVideoBuffering && isAudioBuffering) ? '映像・音声の両方' : (isVideoBuffering ? '映像側' : '音声側'))
+                    : '映像';
                 bufferingMessage.textContent = `${who}のバッファリングを待機中...`;
                 setStatus('buffering', `バッファ待機中 (${who})`);
 
-                // 再生中だった場合は片方だけ進まないよう一時停止して待機
-                if (!videoEl.paused || !audioEl.paused) {
+                if (userWantsToPlay) {
                     videoEl.pause();
-                    audioEl.pause();
+                    if (hasSeparateAudio) audioEl.pause();
                 }
             } else {
                 bufferingOverlay.classList.add('hidden');
@@ -587,15 +604,19 @@
         });
 
         // 音声側イベント
-        audioEl.addEventListener('waiting', () => { isAudioBuffering = true; evaluateBufferingState(); });
-        audioEl.addEventListener('stalled', () => { isAudioBuffering = true; evaluateBufferingState(); });
-        audioEl.addEventListener('canplay', () => { isAudioBuffering = false; evaluateBufferingState(); });
+        audioEl.addEventListener('waiting', () => { if (!hasSeparateAudio) return; isAudioBuffering = true; evaluateBufferingState(); });
+        audioEl.addEventListener('stalled', () => { if (!hasSeparateAudio) return; isAudioBuffering = true; evaluateBufferingState(); });
+        audioEl.addEventListener('canplay', () => { if (!hasSeparateAudio) return; isAudioBuffering = false; evaluateBufferingState(); });
         audioEl.addEventListener('loadedmetadata', () => {
-            updateStreamInfoText();
+            if (hasSeparateAudio) updateStreamInfoText();
         });
 
         function updateStreamInfoText() {
             const vDur = isFinite(videoEl.duration) ? formatTime(videoEl.duration) : '読込中';
+            if (!hasSeparateAudio) {
+                streamInfoDisplay.textContent = `一体型動画: ${vDur}`;
+                return;
+            }
             const aDur = isFinite(audioEl.duration) ? formatTime(audioEl.duration) : '読込中';
             streamInfoDisplay.textContent = `映像長: ${vDur} / 音声長: ${aDur}`;
         }
@@ -611,6 +632,7 @@
         });
 
         audioEl.addEventListener('error', () => {
+            if (!hasSeparateAudio) return;
             const code = audioEl.error ? audioEl.error.code : '不明';
             bufferingOverlay.classList.add('hidden');
             showError(
@@ -623,7 +645,7 @@
         // ドリフト（音ズレ）監視＆自動補正エンジン
         // ==========================================
         function syncAudioToVideo(force = false) {
-            if (!isFinite(videoEl.currentTime)) return;
+            if (!hasSeparateAudio || !isFinite(videoEl.currentTime)) return;
             // 目標となる音声再生位置 = 映像位置 + オフセット
             let targetAudioTime = Math.max(0, videoEl.currentTime + audioOffset);
             if (isFinite(audioEl.duration) && targetAudioTime > audioEl.duration) {
@@ -650,7 +672,7 @@
         function startDriftMonitor() {
             stopDriftMonitor();
             syncInterval = setInterval(() => {
-                if (!videoEl.paused && !audioEl.paused && !isSeeking) {
+                if (hasSeparateAudio && !videoEl.paused && !audioEl.paused && !isSeeking) {
                     syncAudioToVideo(false);
                 }
             }, 500);
@@ -683,7 +705,7 @@
 
         restartBtn.addEventListener('click', () => {
             videoEl.currentTime = 0;
-            audioEl.currentTime = Math.max(0, audioOffset);
+            if (hasSeparateAudio) audioEl.currentTime = Math.max(0, audioOffset);
             seekBar.value = 0;
             currentTimeDisplay.textContent = formatTime(0);
             if (userWantsToPlay) playBoth();
@@ -710,7 +732,7 @@
         seekBar.addEventListener('change', () => {
             const newTime = parseFloat(seekBar.value);
             videoEl.currentTime = newTime;
-            audioEl.currentTime = Math.max(0, newTime + audioOffset);
+            if (hasSeparateAudio) audioEl.currentTime = Math.max(0, newTime + audioOffset);
             isSeeking = false;
             if (userWantsToPlay) {
                 playBoth();
@@ -726,18 +748,21 @@
         // 音量・ミュート
         volumeSlider.addEventListener('input', () => {
             const vol = parseFloat(volumeSlider.value);
-            audioEl.volume = vol;
-            audioEl.muted = (vol === 0);
+            const soundEl = hasSeparateAudio ? audioEl : videoEl;
+            soundEl.volume = vol;
+            soundEl.muted = (vol === 0);
             updateMuteIcon();
         });
 
         muteBtn.addEventListener('click', () => {
-            audioEl.muted = !audioEl.muted;
+            const soundEl = hasSeparateAudio ? audioEl : videoEl;
+            soundEl.muted = !soundEl.muted;
             updateMuteIcon();
         });
 
         function updateMuteIcon() {
-            if (audioEl.muted || audioEl.volume === 0) {
+            const soundEl = hasSeparateAudio ? audioEl : videoEl;
+            if (soundEl.muted || soundEl.volume === 0) {
                 volHighIcon.classList.add('hidden');
                 volMuteIcon.classList.remove('hidden');
             } else {
@@ -750,7 +775,7 @@
         speedSelect.addEventListener('change', () => {
             const rate = parseFloat(speedSelect.value);
             videoEl.playbackRate = rate;
-            audioEl.playbackRate = rate;
+            if (hasSeparateAudio) audioEl.playbackRate = rate;
             syncAudioToVideo(true);
         });
 
@@ -779,7 +804,7 @@
 
         // 映像側ミュート切替チェックボックス
         unmuteVideoCheck.addEventListener('change', () => {
-            videoEl.muted = !unmuteVideoCheck.checked;
+            if (hasSeparateAudio) videoEl.muted = !unmuteVideoCheck.checked;
         });
 
         // フルスクリーン切替
