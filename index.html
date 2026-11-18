@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DualStream Player MSE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.4/dist/mp4box.all.min.js"></script>
+<style>
+:root{color-scheme:dark}body{background:#080b12;color:#e5e7eb}input,select,button{font:inherit}input{min-width:0}.panel{background:#111827;border:1px solid #263244}.field{background:#080d17;border:1px solid #334155}.btn{background:#263449;border:1px solid #3b4b63}.btn:hover{background:#34465f}.primary{background:#2563eb;border:1px solid #3b82f6}.muted{color:#94a3b8}#video{width:100%;max-height:65vh;background:#000}#log{white-space:pre-wrap;overflow-wrap:anywhere}input[type=range]{accent-color:#3b82f6}
+</style>
+</head>
+<body class="min-h-screen">
+<main class="max-w-5xl mx-auto p-4 md:p-7 space-y-5">
+<header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-2xl font-bold">DualStream Player</h1><p class="muted text-sm mt-1">Separate video + audio / Media Source Extensions</p></div><span id="statePill" class="text-xs px-3 py-1 rounded-full bg-slate-800">待機中</span></header>
+<section class="panel rounded-2xl p-3 md:p-4 space-y-3">
+<video id="video" controls playsinline preload="metadata"></video>
+<div class="flex flex-wrap items-center gap-3 text-sm"><button id="playBtn" class="btn rounded-lg px-4 py-2">再生</button><button id="pauseBtn" class="btn rounded-lg px-4 py-2">一時停止</button><button id="restartBtn" class="btn rounded-lg px-4 py-2">最初から</button><label class="flex items-center gap-2 ml-auto muted">速度<select id="speed" class="field rounded-lg px-2 py-2"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select></label></div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm"><div class="field rounded-lg p-3"><div class="muted text-xs">映像ストリーム</div><div id="videoMeta" class="mt-1 break-all">未読み込み</div></div><div class="field rounded-lg p-3"><div class="muted text-xs">音声ストリーム</div><div id="audioMeta" class="mt-1 break-all">未読み込み</div></div></div>
+</section>
+<section class="panel rounded-2xl p-4 md:p-5 space-y-4">
+<div><h2 class="font-semibold">ソース指定</h2><p class="muted text-xs mt-1">/数字でスプレッドシートから取得。直接URL指定にも対応。</p></div>
+<div><label for="sourceInput" class="block text-sm mb-1">番号 / 映像URL</label><input id="sourceInput" class="field rounded-lg w-full px-3 py-3" placeholder="/1 または https://..."></div>
+<div class="grid sm:grid-cols-2 gap-3"><div><label for="videoUrl" class="block text-sm mb-1">映像URL（直接指定）</label><input id="videoUrl" class="field rounded-lg w-full px-3 py-2 text-sm" placeholder="映像URL"></div><div><label for="audioUrl" class="block text-sm mb-1">音声URL（直接指定）</label><input id="audioUrl" class="field rounded-lg w-full px-3 py-2 text-sm" placeholder="音声URL"></div></div>
+<details class="text-sm"><summary class="cursor-pointer muted">GAS設定</summary><div class="grid sm:grid-cols-2 gap-3 mt-3"><div class="sm:col-span-2"><label for="gasUrl" class="block mb-1 muted text-xs">GAS WebアプリURL</label><input id="gasUrl" class="field rounded-lg w-full px-3 py-2 text-sm" value="https://script.google.com/macros/s/AKfycby5gNKjiTL28GZob1QdVxfdfWYKyntmNfv6-Dh63DMs_p4lbRbbFH3FLfjueQplqLEk/exec"></div><div><label for="token" class="block mb-1 muted text-xs">トークン</label><input id="token" type="password" class="field rounded-lg w-full px-3 py-2 text-sm" placeholder="GASのAPI_TOKEN"></div><p class="muted text-xs self-end">トークンは入力欄で指定します。公開リポジトリに埋め込まないでください。</p></div></details>
+<div class="flex flex-wrap gap-2"><button id="loadBtn" class="primary rounded-lg px-5 py-2.5 font-semibold">読み込んで再生</button><button id="clearBtn" class="btn rounded-lg px-4 py-2.5">クリア</button></div>
+</section>
+<section class="panel rounded-2xl p-4 space-y-3"><div class="flex items-center justify-between gap-3"><h2 class="font-semibold">診断ログ</h2><button id="copyLogBtn" class="btn rounded-lg px-3 py-1.5 text-xs">ログをコピー</button></div><p class="muted text-xs">エラーが出たら、このログを共有してください。</p><pre id="log" class="field rounded-lg p-3 text-xs leading-relaxed min-h-24">初期化済み。ソースを指定してください。</pre></section>
+<footer class="muted text-xs leading-relaxed">MSEには対応したMP4トラックとセグメントが必要です。MP4Box.jsで分割を試みますが、CORSで取得できないURL、暗号化・特殊形式、未対応コーデックは再生できません。CORS制限を回避する機能は含みません。</footer>
+</main>
+<script>
+(() => {
+const $=id=>document.getElementById(id), video=$('video');
+let mediaSource=null, objectUrl=null, generation=0, parsers=[];
+function log(msg,data){const t=new Date().toLocaleTimeString();let s=`[${t}] ${msg}`;if(data!==undefined){try{s+='\n'+(typeof data==='string'?data:JSON.stringify(data,null,2))}catch(_){s+='\n'+String(data)}}$('log').textContent+='\n\n'+s;$('log').scrollTop=$('log').scrollHeight;console.log(s)}
+function state(s){$('statePill').textContent=s}
+function reset(){generation++;parsers.forEach(p=>{try{p.stop()}catch(_){}});parsers=[];video.pause();video.removeAttribute('src');video.load();if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=null;mediaSource=null;return generation}
+async function resolveSource(){
+ const raw=$('sourceInput').value.trim();
+ if(/^\/?\d+$/.test(raw)){
+  const row=Number(raw.replace('/',''));if(!Number.isSafeInteger(row)||row<1)throw Error('番号は1以上の整数にしてください');
+  const token=$('token').value;if(!token)throw Error('GASトークンが未入力です');
+  const u=new URL($('gasUrl').value.trim());u.searchParams.set('row',row);u.searchParams.set('token',token);
+  log(`GASから行 ${row} を取得します`);
+  const r=await fetch(u);if(!r.ok)throw Error(`GAS HTTPエラー: ${r.status}`);
+  const d=await r.json();log('GAS応答',d);if(!d.success)throw Error(d.error||'GAS取得失敗');
+  $('videoUrl').value=d.videoUrl||'';$('audioUrl').value=d.audioUrl||'';
+ }
+ if(/^https?:\/\//i.test(raw))$('videoUrl').value=raw;
+ return {v:$('videoUrl').value.trim(),a:$('audioUrl').value.trim()};
+}
+async function getBytes(url,label){
+ try{const r=await fetch(url);if(!r.ok)throw Error(`HTTP ${r.status} ${r.statusText}`);const b=await r.arrayBuffer();if(!b.byteLength)throw Error('空のファイルです');log(`${label}: ${(b.byteLength/1048576).toFixed(2)} MiB取得`);return b}
+ catch(e){if(e instanceof TypeError)throw Error(`${label}を取得できません。CORS、URL期限切れ、ネットワーク制限の可能性: ${e.message}`);throw Error(`${label}取得失敗: ${e.message}`)}
+}
+function buildMSE(vbuf,abuf,run){
+ return new Promise((resolve,reject)=>{
+  if(!window.MediaSource) return reject(Error('MediaSource API非対応'));
+  if(!window.MP4Box) return reject(Error('MP4Box.jsの読み込み失敗。CDN接続を確認'));
+  let failed=false, opened=false, completed={video:false,audio:false}, infos={}, sb={}, queues={};
+  const fail=e=>{if(failed)return;failed=true;reject(e instanceof Error?e:Error(String(e)))};
+  const pump=k=>{const q=queues[k],b=sb[k];if(!q||!b||b.updating||!q.items.length||failed){checkEnd();return}try{b.appendBuffer(q.items.shift())}catch(e){fail(Error(`${k} appendBuffer: ${e.name}: ${e.message}`))}};
+  const enqueue=(k,b)=>{queues[k].items.push(b);pump(k)};
+  const checkEnd=()=>{if(!opened||failed||!completed.video||!completed.audio)return;const empty=Object.keys(queues).every(k=>!queues[k].items.length&&!sb[k].updating);if(empty&&mediaSource.readyState==='open'){try{mediaSource.endOfStream();log('両トラックの投入完了。endOfStream()')}catch(e){log('endOfStream警告',e.message)}}};
+  mediaSource=new MediaSource();objectUrl=URL.createObjectURL(mediaSource);video.src=objectUrl;
+  const make=(kind,buf)=>{
+   const mp4=MP4Box.createFile();parsers.push(mp4);
+   mp4.onError=e=>fail(Error(`${kind} MP4解析エラー: ${e}`));
+   mp4.onReady=info=>{
+    if(failed||run!==generation)return;
+    const track=kind==='video'?(info.videoTracks||[])[0]:(info.audioTracks||[])[0];
+    if(!track)return fail(Error(`${kind}トラックがファイル内にありません`));
+    const mime=`${kind}/mp4; codecs="${track.codec}"`;
+    infos[kind]={codec:track.codec,duration:(info.duration/info.timescale).toFixed(2),mime,trackId:track.id};
+    log(`${kind}トラック検出`,infos[kind]);
+    if(!MediaSource.isTypeSupported(mime))return fail(Error(`MSE非対応codec: ${mime}`));
+    mp4.setSegmentOptions(track.id,kind,{nbSamples:1000});
+    const init=mp4.initializeSegmentation();
+    if(!init||!init.length)return fail(Error(`${kind}初期化セグメントを生成できません`));
+    try{
+     const sourceBuffer=mediaSource.addSourceBuffer(mime);sb[kind]=sourceBuffer;queues[kind]={items:[]};
+     sourceBuffer.mode='segments';
+     sourceBuffer.addEventListener('updateend',()=>pump(kind));
+     sourceBuffer.addEventListener('error',()=>fail(Error(`${kind} SourceBuffer error`)));
+     enqueue(kind,init[0].buffer);
+    }catch(e){return fail(Error(`${kind} SourceBuffer作成失敗: ${e.name}: ${e.message}`))}
+    mp4.onSegment=(id,user,segment)=>{if(run===generation&&!failed)enqueue(kind,segment.buffer)};
+    mp4.start();mp4.flush();completed[kind]=true;checkEnd();
+    $(`${kind}Meta`).textContent=`${track.codec} / ${infos[kind].duration}秒`;
+   };
+   buf.fileStart=0;mp4.appendBuffer(buf);mp4.flush();
+  };
+  mediaSource.addEventListener('sourceopen',()=>{opened=true;log('MediaSource sourceopen');try{make('video',vbuf);make('audio',abuf)}catch(e){fail(e)}},{once:true});
+  mediaSource.addEventListener('error',()=>fail(Error('MediaSource error')));
+  const timeout=setTimeout(()=>{if(!failed&&video.readyState===0)fail(Error('20秒以内にメタデータが準備されませんでした。MP4構造・セグメント生成を確認'))},20000);
+  const loaded=()=>{video.removeEventListener('loadedmetadata',loaded);clearTimeout(timeout);if(run===generation){log(`MSEメタデータ準備完了: ${video.duration}`);resolve()}};
+  video.addEventListener('loadedmetadata',loaded);
+  // Rejecting clears the timeout through the error handler below.
+  const oldFail=fail;
+ });
+}
+async function load(){
+ const run=reset();$('log').textContent='';$('videoMeta').textContent='解析中';$('audioMeta').textContent='解析中';state('読み込み中');$('loadBtn').disabled=true;
+ try{
+  const s=await resolveSource();if(run!==generation)return;
+  if(!s.v||!s.a)throw Error('映像URLと音声URLの両方を入力してください');
+  if(!/^https?:\/\//i.test(s.v)||!/^https?:\/\//i.test(s.a))throw Error('URLはhttp(s)で始まる必要があります');
+  log('映像・音声ファイルを取得します');
+  const [v,a]=await Promise.all([getBytes(s.v,'映像'),getBytes(s.a,'音声')]);if(run!==generation)return;
+  log('MP4解析とMSEセグメント生成を開始');
+  await buildMSE(v,a,run);if(run!==generation)return;
+  state('再生準備完了');try{await video.play();log('自動再生開始')}catch(e){log(`自動再生不可: ${e.message}。再生ボタンを押してください`)}
+ }catch(e){state('エラー');log(`ERROR: ${e.name||'Error'}: ${e.message}`);console.error(e)}
+ finally{$('loadBtn').disabled=false}
+}
+$('loadBtn').addEventListener('click',load);
+$('clearBtn').addEventListener('click',()=>{reset();$('sourceInput').value='';$('videoUrl').value='';$('audioUrl').value='';$('videoMeta').textContent='未読み込み';$('audioMeta').textContent='未読み込み';$('log').textContent='クリアしました';state('待機中')});
+$('playBtn').onclick=()=>video.play().catch(e=>log(`再生エラー: ${e.message}`));
+$('pauseBtn').onclick=()=>video.pause();
+$('restartBtn').onclick=()=>{video.currentTime=0;video.play().catch(e=>log(e.message))};
+$('speed').onchange=e=>video.playbackRate=Number(e.target.value);
+$('copyLogBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('log').textContent);log('ログをコピーしました')}catch(e){log(`コピー失敗: ${e.message}`)}};
+video.addEventListener('waiting',()=>state('バッファ待ち'));video.addEventListener('playing',()=>state('再生中'));video.addEventListener('error',()=>{const e=video.error;log('video要素エラー',e?{code:e.code,message:e.message}:'詳細なし');state('動画エラー')});
+if(!window.MediaSource)log('警告: MediaSource API非対応');
+if(!window.MP4Box)log('警告: MP4Box.js未ロード');
+})();
+</script>
+</body>
+</html>
